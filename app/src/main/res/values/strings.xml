@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Floating Buttons</string>
+    <string name="show_floating_window">显示悬浮窗</string>
+    <string name="event_id_key_up">上键的 Event ID</string>
+    <string name="id_key_up">上键的按键 ID</string>
+    <string name="event_id_key_down">下键的 Event ID</string>
+    <string name="id_key_down">下键的按键 ID</string>
+    <string name="catch_key">获取按键</string>
+    <string name="stop_catching">停止获取</string>
+    <string name="save_settings">保存设置</string>
+    <string name="get_screen_event">获取屏幕的 Event ID</string>
+</resources>
