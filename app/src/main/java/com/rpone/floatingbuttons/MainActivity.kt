@@ -7,6 +7,7 @@ import android.content.res.Resources
 import android.graphics.PixelFormat
 import android.os.*
 import android.provider.Settings
+import android.text.TextUtils
 import android.util.Log
 import android.view.*
 import android.widget.*
@@ -54,9 +55,21 @@ class MainActivity : AppCompatActivity() {
     private lateinit var downKeyCatchButton: Button
     private lateinit var saveSettingsButton: Button
 
+    // 声明界面上文本框所需的变量
+    private lateinit var upKeyEventEditText: EditText
+    private lateinit var upKeyIdEditText: EditText
+    private lateinit var downKeyEventEditText: EditText
+    private lateinit var downKeyIdEditText: EditText
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // 初始化文本框
+        upKeyEventEditText = findViewById(R.id.key_up_event)
+        upKeyIdEditText = findViewById(R.id.key_up_id)
+        downKeyEventEditText = findViewById(R.id.key_down_event)
+        downKeyIdEditText = findViewById(R.id.key_down_id)
 
         // 启动时调用屏幕捕获方法
         getScreenEvent()
@@ -64,7 +77,7 @@ class MainActivity : AppCompatActivity() {
         catchUpKey()
         // 启动时调用下键捕获方法
         catchDownKey()
-
+        // 启动时调用保存设置方法
         saveSettings()
 
         // 该 Switch 用于控制悬浮窗的显示
@@ -73,8 +86,17 @@ class MainActivity : AppCompatActivity() {
             if (isChecked) {
                 // 点击 Switch 后检查是否已授予悬浮窗权限
                 if (hasOverlayPermission()) {
-                    // 如果已授予权限，判断是否配置完成
-                    if (screenEventNumber != -1 && keyUpID != -1 && keyUpEventNumber != -1 && keyDownID != -1 && keyDownEventNumber != -1) {
+                    // 如果已授予权限，判断是否配置完成（四个输入框均不为空）
+                    if ((!TextUtils.isEmpty(upKeyEventEditText.text))
+                        && (!TextUtils.isEmpty(upKeyIdEditText.text))
+                        && (!TextUtils.isEmpty(downKeyEventEditText.text))
+                        && (!TextUtils.isEmpty(downKeyIdEditText.text))) {
+                        // 将输入框内容赋值给对应变量
+                        keyUpEventNumber = upKeyEventEditText.text.toString().toInt()
+                        keyUpID = upKeyIdEditText.text.toString().toInt()
+                        keyDownEventNumber = downKeyEventEditText.text.toString().toInt()
+                        keyDownID = downKeyIdEditText.text.toString().toInt()
+
                         // 显示悬浮窗
                         showFloatingWindow()
                     } else {
@@ -194,8 +216,6 @@ class MainActivity : AppCompatActivity() {
 
         // 定义变量
         upKeyCatchButton = findViewById(R.id.key_up_sync_btn)
-        val upKeyEventEditText = findViewById<EditText>(R.id.key_up_event)
-        val upKeyIdEditText = findViewById<EditText>(R.id.key_up_id)
 
         upKeyCatchButton.setOnClickListener {
             if (screenEventNumber != -1) {
@@ -282,8 +302,6 @@ class MainActivity : AppCompatActivity() {
 
         // 定义变量
         downKeyCatchButton = findViewById(R.id.key_down_sync_btn)
-        val downKeyEventEditText = findViewById<EditText>(R.id.key_down_event)
-        val downKeyIdEditText = findViewById<EditText>(R.id.key_down_id)
 
         downKeyCatchButton.setOnClickListener {
             if (screenEventNumber != -1) {
@@ -391,11 +409,10 @@ class MainActivity : AppCompatActivity() {
                     try {
                         // 按下按钮时模拟按下键盘上键
                         val os = DataOutputStream(proc.outputStream)
-                        // 发送 id 为 103 的按键（上键）的 Down 事件
+                        // 发送上键的 Down 事件
                         os.writeBytes("sendevent /dev/input/event$keyUpEventNumber 1 $keyUpID 1\n")
                         // sync 状态
                         os.writeBytes("sendevent /dev/input/event$keyUpEventNumber 0 0 0\n")
-                        // os.writeBytes("exit\n")
                         // 刷新输出流
                         os.flush()
                     } catch (e: Exception) {
@@ -406,11 +423,10 @@ class MainActivity : AppCompatActivity() {
                     try {
                         // 松开按钮时模拟松开键盘上键
                         val os = DataOutputStream(proc.outputStream)
-                        // 发送 id 为 103 的按键（上键）的 Up 事件
+                        // 发送上键的 Up 事件
                         os.writeBytes("sendevent /dev/input/event$keyUpEventNumber 1 $keyUpID 0\n")
                         // sync 状态
                         os.writeBytes("sendevent /dev/input/event$keyUpEventNumber 0 0 0\n")
-                        // os.writeBytes("exit\n")
                         // 刷新输出流
                         os.flush()
                     } catch (e: Exception) {
@@ -425,9 +441,9 @@ class MainActivity : AppCompatActivity() {
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
                     try {
-                        // 按下按钮时模拟按下键盘下键
+                        // 松开按钮时模拟按下键盘下键
                         val os = DataOutputStream(proc.outputStream)
-                        // 发送 id 为 105 的按键（下键）的 Down 事件
+                        // 发送下键的 Down 事件
                         os.writeBytes("sendevent /dev/input/event$keyDownEventNumber 1 $keyDownID 1\n")
                         //sync 状态
                         os.writeBytes("sendevent /dev/input/event$keyDownEventNumber 0 0 0\n")
@@ -442,7 +458,7 @@ class MainActivity : AppCompatActivity() {
                     try {
                         // 按下按钮时模拟松开键盘下键
                         val os = DataOutputStream(proc.outputStream)
-                        // 发送 id 为 105 的按键（下键）的 Down 事件
+                        // 发送下键的 Up 事件
                         os.writeBytes("sendevent /dev/input/event$keyDownEventNumber 1 $keyDownID 0\n")
                         //sync 状态
                         os.writeBytes("sendevent /dev/input/event$keyDownEventNumber 0 0 0\n")
