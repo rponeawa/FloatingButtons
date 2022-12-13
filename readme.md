@@ -7,3 +7,9 @@
 使用 sendevent 来模拟按键的按下和松开，因此支持模拟需要长按来使用的按键。需要 Root 权限。
 
 ![运行截图](screenshot.png "Screenshot")
+
+## TODO（并不保证会写）
+
+- 保存设置
+- 「关于」页面
+- 可能的 UI 优化
