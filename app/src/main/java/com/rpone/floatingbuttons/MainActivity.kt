@@ -3,6 +3,7 @@ package com.rpone.floatingbuttons
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.res.Resources
 import android.graphics.PixelFormat
 import android.os.*
@@ -61,6 +62,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var downKeyEventEditText: EditText
     private lateinit var downKeyIdEditText: EditText
 
+    private lateinit var sharedPref: SharedPreferences
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -71,6 +74,10 @@ class MainActivity : AppCompatActivity() {
         downKeyEventEditText = findViewById(R.id.key_down_event)
         downKeyIdEditText = findViewById(R.id.key_down_id)
 
+        sharedPref = getSharedPreferences("setting_prefs", Context.MODE_PRIVATE)
+
+        // 启用时调用读取设置方法
+        loadSettings()
         // 启动时调用屏幕捕获方法
         getScreenEvent()
         // 启动时调用上键捕获方法
@@ -79,7 +86,6 @@ class MainActivity : AppCompatActivity() {
         catchDownKey()
         // 启动时调用保存设置方法
         saveSettings()
-
         // 该 Switch 用于控制悬浮窗的显示
         val switch = findViewById<Switch>(R.id.start_switch)
         switch.setOnCheckedChangeListener { _, isChecked ->
@@ -96,6 +102,9 @@ class MainActivity : AppCompatActivity() {
                         keyUpID = upKeyIdEditText.text.toString().toInt()
                         keyDownEventNumber = downKeyEventEditText.text.toString().toInt()
                         keyDownID = downKeyIdEditText.text.toString().toInt()
+
+                        // 保存设置
+                        saveSettings()
 
                         // 显示悬浮窗
                         showFloatingWindow()
@@ -129,9 +138,56 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun saveValues(key: String, value: Int) {
+        val editor = sharedPref.edit()
+        editor.putInt(key, value)
+        editor.apply()
+    }
+
+    private fun loadSettings() {
+        // 如果缓存中存在对应键值
+        if ((sharedPref.contains("key-up-event"))
+            && (sharedPref.contains("key-up-id"))
+            && (sharedPref.contains("key-down-event"))
+            && (sharedPref.contains("key-down-id"))) {
+            // 将值赋给对应变量
+            keyUpEventNumber = sharedPref.getInt("key-up-event", 0)
+            keyUpID = sharedPref.getInt("key-up-id", 0)
+            keyDownEventNumber = sharedPref.getInt("key-down-event", 0)
+            keyDownID = sharedPref.getInt("key-down-id", 0)
+
+            // 填入文本框
+            upKeyEventEditText.setText(keyUpEventNumber.toString())
+            upKeyIdEditText.setText(keyUpID.toString())
+            downKeyEventEditText.setText(keyDownEventNumber.toString())
+            downKeyIdEditText.setText(keyDownID.toString())
+        }
+    }
+
     private fun saveSettings() {
         val saveSettingsButton = findViewById<Button>(R.id.save_btn)
-        saveSettingsButton.setOnClickListener { Toast.makeText(applicationContext, "还没写完😭", Toast.LENGTH_SHORT).show() }
+        saveSettingsButton.setOnClickListener {
+            if ((!TextUtils.isEmpty(upKeyEventEditText.text))
+                && (!TextUtils.isEmpty(upKeyIdEditText.text))
+                && (!TextUtils.isEmpty(downKeyEventEditText.text))
+                && (!TextUtils.isEmpty(downKeyIdEditText.text))) {
+                // 将输入框内容赋值给对应变量
+                keyUpEventNumber = upKeyEventEditText.text.toString().toInt()
+                keyUpID = upKeyIdEditText.text.toString().toInt()
+                keyDownEventNumber = downKeyEventEditText.text.toString().toInt()
+                keyDownID = downKeyIdEditText.text.toString().toInt()
+
+                // 写入变量进缓存
+                saveValues("key-up-event", keyUpEventNumber)
+                saveValues("key-up-id", keyUpID)
+                saveValues("key-down-event", keyDownEventNumber)
+                saveValues("key-down-id", keyDownID)
+
+                Toast.makeText(application, "设置已保存", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(applicationContext, "请先完成配置", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     //屏幕捕获方法
