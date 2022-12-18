@@ -435,7 +435,7 @@ class MainActivity : AppCompatActivity() {
         floatingWindowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         floatingWindow = View.inflate(this, R.layout.floating_window, null)
         params = WindowManager.LayoutParams(
-            115, // 宽度
+            100, // 宽度
             200, // 高度
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, // 窗口类型
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, // 不可获得焦点

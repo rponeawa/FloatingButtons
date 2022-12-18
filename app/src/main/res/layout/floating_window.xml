@@ -10,8 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:text="上"
-        android:textSize="24dp"
+        android:alpha="0.75"
         android:layout_marginLeft="5dp"
         android:layout_marginRight="5dp"/>
 
@@ -20,8 +19,8 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:text="下"
-        android:textSize="24dp"
+        android:alpha="0.75"
+        android:backgroundTint="@color/blue_700"
         android:layout_marginLeft="5dp"
         android:layout_marginRight="5dp"/>
 
