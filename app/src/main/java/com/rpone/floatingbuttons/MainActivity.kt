@@ -5,41 +5,42 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.Resources
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.*
 import android.provider.Settings
+import android.text.Html
 import android.text.TextUtils
 import android.util.Log
 import android.view.*
 import android.widget.*
+import androidx.appcompat.app.ActionBarDrawerToggle
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import java.io.BufferedReader
 import java.io.DataOutputStream
 import java.io.InputStreamReader
 import java.lang.Process
 
-
 class MainActivity : AppCompatActivity() {
-    // 定义需要的全局变量
-    companion object {
-        // 定义需要的按钮点击状态变量
-        var catchUpKeyClicked = false
-        var catchDownKeyClicked = false
-        var catchScreenClicked = false
+    // 定义需要的按钮点击状态变量
+    private var catchUpKeyClicked = false
+    private var catchDownKeyClicked = false
+    private var catchScreenClicked = false
 
-        // 获取运行时
-        val runtime: Runtime = Runtime.getRuntime()
+    // 获取运行时
+    private val runtime: Runtime = Runtime.getRuntime()
 
-        var stopCatchUp = false
-        var stopCatchDown = false
-        var stopCatchScreen = false
+    private var stopCatchUp = false
+    private var stopCatchDown = false
+    private var stopCatchScreen = false
 
-        var screenEventNumber = -1
-        var keyUpID = -1
-        var keyUpEventNumber = -1
-        var keyDownID = -1
-        var keyDownEventNumber = -1
-    }
+    private var screenEventNumber = -1
+    private var keyUpID = -1
+    private var keyUpEventNumber = -1
+    private var keyDownID = -1
+    private var keyDownEventNumber = -1
 
     // 声明悬浮窗所需的变量
     private lateinit var floatingWindowManager: WindowManager
@@ -54,7 +55,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var screenCatchButton: Button
     private lateinit var upKeyCatchButton: Button
     private lateinit var downKeyCatchButton: Button
-    private lateinit var saveSettingsButton: Button
 
     // 声明界面上文本框所需的变量
     private lateinit var upKeyEventEditText: EditText
@@ -64,9 +64,91 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var sharedPref: SharedPreferences
 
+    // 重写 ArrayAdapter，以实现修改列表当前项目的背景颜色
+    class MyArrayAdapter(context: Context, items: Array<String>) :
+        ArrayAdapter<String>(context, android.R.layout.simple_list_item_1, items) {
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val view = super.getView(position, convertView, parent)
+            if (position == 0) {
+                view.setBackgroundColor(Color.parseColor("#BBDEFB"))
+            }
+            return view
+        }
+    }
+
+    // 显示右上角菜单
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return super.onCreateOptionsMenu(menu)
+    }
+
+    // 右上角菜单中 item 点击动作
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.action_about -> {
+                val link = "<a href='https://github.com/rpOneawa/FloatingButtons'>https://github.com/rpOneawa/FloatingButtons</a>"
+                val message = Html.fromHtml(link)
+
+                val builder = AlertDialog.Builder(this)
+                    .setTitle("关于")
+                    .setMessage(message)
+                    .setPositiveButton("确定", null)
+
+                val dialog = builder.create()
+                dialog.show()
+            }
+        }
+        return super.onOptionsItemSelected(item)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // 获取 DrawerLayout、Toolbar 和 ListView 的实例
+        val drawerLayout =
+            findViewById<androidx.drawerlayout.widget.DrawerLayout>(R.id.drawer_layout)
+        val navList = findViewById<ListView>(R.id.nav_list)
+        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+
+        // 初始化 Toolbar
+        setSupportActionBar(toolbar)
+
+        // 设置 ListView 的适配器
+        val navItems = arrayOf("主页", "布局文件编辑")
+        navList.adapter = MyArrayAdapter(this, navItems)
+
+        // 设置 ListView 点击事件
+        navList.setOnItemClickListener { _, _, position, _ ->
+            // 根据点击的位置打开对应的 Activity
+            when (position) {
+                2 -> {
+                    val intent = Intent(this, FileEditActivity::class.java)
+                    startActivity(intent)
+                    finish()
+                }
+            }
+            // 关闭侧边栏
+            drawerLayout.closeDrawers()
+        }
+        // 使用 ActionBarDrawerToggle 为 Toolbar 添加打开和关闭侧边栏的功能
+        val toggle = ActionBarDrawerToggle(
+            this, drawerLayout, toolbar,
+            R.string.nav_drawer_open, R.string.nav_drawer_close
+        )
+        drawerLayout.addDrawerListener(toggle)
+        toggle.syncState()
+
+        // 设置 toolbar 上图标的资源文件
+        toolbar.setNavigationIcon(R.drawable.menu_white_24dp)
+        toolbar.overflowIcon = ContextCompat.getDrawable(this, R.drawable.more_horiz_white_24dp)
+
+        val headerView = View(this)
+        headerView.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            32
+        )
+        navList.addHeaderView(headerView)
 
         // 初始化文本框
         upKeyEventEditText = findViewById(R.id.key_up_event)
@@ -96,7 +178,8 @@ class MainActivity : AppCompatActivity() {
                     if ((!TextUtils.isEmpty(upKeyEventEditText.text))
                         && (!TextUtils.isEmpty(upKeyIdEditText.text))
                         && (!TextUtils.isEmpty(downKeyEventEditText.text))
-                        && (!TextUtils.isEmpty(downKeyIdEditText.text))) {
+                        && (!TextUtils.isEmpty(downKeyIdEditText.text))
+                    ) {
                         // 将输入框内容赋值给对应变量
                         keyUpEventNumber = upKeyEventEditText.text.toString().toInt()
                         keyUpID = upKeyIdEditText.text.toString().toInt()
@@ -149,7 +232,8 @@ class MainActivity : AppCompatActivity() {
         if ((sharedPref.contains("key-up-event"))
             && (sharedPref.contains("key-up-id"))
             && (sharedPref.contains("key-down-event"))
-            && (sharedPref.contains("key-down-id"))) {
+            && (sharedPref.contains("key-down-id"))
+        ) {
             // 将值赋给对应变量
             keyUpEventNumber = sharedPref.getInt("key-up-event", 0)
             keyUpID = sharedPref.getInt("key-up-id", 0)
@@ -170,7 +254,8 @@ class MainActivity : AppCompatActivity() {
             if ((!TextUtils.isEmpty(upKeyEventEditText.text))
                 && (!TextUtils.isEmpty(upKeyIdEditText.text))
                 && (!TextUtils.isEmpty(downKeyEventEditText.text))
-                && (!TextUtils.isEmpty(downKeyIdEditText.text))) {
+                && (!TextUtils.isEmpty(downKeyIdEditText.text))
+            ) {
                 // 将输入框内容赋值给对应变量
                 keyUpEventNumber = upKeyEventEditText.text.toString().toInt()
                 keyUpID = upKeyIdEditText.text.toString().toInt()
@@ -223,11 +308,11 @@ class MainActivity : AppCompatActivity() {
                 val reader = BufferedReader(InputStreamReader(catching_proc.inputStream))
 
                 stopCatchScreen = false
-
                 // 创建新线程来执行读取操作
                 Thread {
                     var line: String
-                    while (reader.readLine().also { line = it } != null && !stopCatchScreen) {
+                    while (!stopCatchScreen) {
+                        line = reader.readLine()
                         // 将读取到的结果发送到 UI 线程
                         handler.sendMessage(Message.obtain(handler, 0, line))
                     }
@@ -472,7 +557,8 @@ class MainActivity : AppCompatActivity() {
                         // 刷新输出流
                         os.flush()
                     } catch (e: Exception) {
-                        Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT)
+                            .show()
                     }
                 }
                 MotionEvent.ACTION_UP -> {
@@ -486,7 +572,8 @@ class MainActivity : AppCompatActivity() {
                         // 刷新输出流
                         os.flush()
                     } catch (e: Exception) {
-                        Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT)
+                            .show()
                     }
                 }
             }
@@ -506,7 +593,8 @@ class MainActivity : AppCompatActivity() {
                         // 刷新输出流
                         os.flush()
                     } catch (e: Exception) {
-                        Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT)
+                            .show()
                     }
 
                 }
@@ -521,7 +609,8 @@ class MainActivity : AppCompatActivity() {
                         // 刷新输出流
                         os.flush()
                     } catch (e: Exception) {
-                        Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT)
+                            .show()
                     }
 
                 }
