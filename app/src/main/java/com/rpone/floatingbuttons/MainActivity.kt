@@ -1,12 +1,12 @@
 package com.rpone.floatingbuttons
 
 import android.annotation.SuppressLint
-import android.content.Context
-import android.content.Intent
-import android.content.SharedPreferences
+import android.app.Service
+import android.content.*
 import android.content.res.Resources
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.os.*
 import android.provider.Settings
 import android.text.Html
@@ -18,12 +18,20 @@ import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.getSystemService
 import java.io.BufferedReader
 import java.io.DataOutputStream
 import java.io.InputStreamReader
 import java.lang.Process
 
 class MainActivity : AppCompatActivity() {
+    companion object {
+        // 声明悬浮窗所需的变量
+        private lateinit var floatingWindowManager: WindowManager
+        private lateinit var floatingWindow: View
+        private lateinit var params: WindowManager.LayoutParams
+    }
+
     // 定义需要的按钮点击状态变量
     private var catchUpKeyClicked = false
     private var catchDownKeyClicked = false
@@ -42,11 +50,6 @@ class MainActivity : AppCompatActivity() {
     private var keyDownID = -1
     private var keyDownEventNumber = -1
 
-    // 声明悬浮窗所需的变量
-    private lateinit var floatingWindowManager: WindowManager
-    private lateinit var floatingWindow: View
-    private lateinit var params: WindowManager.LayoutParams
-
     // 声明悬浮窗上按钮所需的变量
     private lateinit var upButton: Button
     private lateinit var downButton: Button
@@ -63,6 +66,51 @@ class MainActivity : AppCompatActivity() {
     private lateinit var downKeyIdEditText: EditText
 
     private lateinit var sharedPref: SharedPreferences
+
+    // 悬浮窗后台服务类
+    class FloatingWindowService : Service() {
+        companion object {
+            const val SERVICE_READY_ACTION = "SERVICE_READY_ACTION"
+        }
+
+        override fun onCreate() {
+            Log.d("floating window service", "started")
+            super.onCreate()
+            // 创建悬浮窗
+            val params = WindowManager.LayoutParams(
+                100, // 宽度
+                200, // 高度
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, // 窗口类型
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, // 不可获得焦点
+                PixelFormat.TRANSLUCENT // 半透明
+            )
+            // 设置悬浮窗的位置
+            params.gravity = Gravity.TOP or Gravity.END
+            // 位于屏幕最右侧
+            params.x = 0
+            // 位于 1/5 的高度处
+            params.y = (Resources.getSystem().displayMetrics.heightPixels / 5)
+            // 显示悬浮窗
+            floatingWindowManager.addView(floatingWindow, params)
+            // 发送广播，表示服务已准备就绪
+            val intent = Intent(SERVICE_READY_ACTION)
+            sendBroadcast(intent)
+        }
+
+        override fun onDestroy() {
+            super.onDestroy()
+            // 移除悬浮窗
+            floatingWindowManager.removeView(floatingWindow)
+        }
+
+        override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+            return START_STICKY
+        }
+
+        override fun onBind(intent: Intent?): IBinder? {
+            return null
+        }
+    }
 
     // 重写 ArrayAdapter，以实现修改列表当前项目的背景颜色
     class MyArrayAdapter(context: Context, items: Array<String>) :
@@ -99,6 +147,98 @@ class MainActivity : AppCompatActivity() {
             }
         }
         return super.onOptionsItemSelected(item)
+    }
+
+    // 接收器，内容是收到悬浮窗创建完成后的广播后执行的操作
+    private val serviceReadyReceiver = object : BroadcastReceiver() {
+        @SuppressLint("ClickableViewAccessibility")
+        override fun onReceive(context: Context?, intent: Intent?) {
+            Log.d("receiver", "received")
+
+            // 初始化按钮所需的变量
+            upButton = floatingWindow.findViewById(R.id.up_button)
+            downButton = floatingWindow.findViewById(R.id.down_button)
+
+            val runtime = Runtime.getRuntime()
+            // 请求 Root 权限
+            val proc = runtime.exec("su")
+
+            // 设置按钮的监听器，以在触摸按钮时模拟键盘按键
+            upButton.setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        try {
+                            // 按下按钮时模拟按下键盘上键
+                            val os = DataOutputStream(proc.outputStream)
+                            // 发送上键的 Down 事件
+                            os.writeBytes("sendevent /dev/input/event$keyUpEventNumber 1 $keyUpID 1\n")
+                            // sync 状态
+                            os.writeBytes("sendevent /dev/input/event$keyUpEventNumber 0 0 0\n")
+                            // 刷新输出流
+                            os.flush()
+                        } catch (e: Exception) {
+                            Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT)
+                                .show()
+                        }
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        try {
+                            // 松开按钮时模拟松开键盘上键
+                            val os = DataOutputStream(proc.outputStream)
+                            // 发送上键的 Up 事件
+                            os.writeBytes("sendevent /dev/input/event$keyUpEventNumber 1 $keyUpID 0\n")
+                            // sync 状态
+                            os.writeBytes("sendevent /dev/input/event$keyUpEventNumber 0 0 0\n")
+                            // 刷新输出流
+                            os.flush()
+                        } catch (e: Exception) {
+                            Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT)
+                                .show()
+                        }
+                    }
+                }
+                true
+            }
+
+            downButton.setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        try {
+                            // 松开按钮时模拟按下键盘下键
+                            val os = DataOutputStream(proc.outputStream)
+                            // 发送下键的 Down 事件
+                            os.writeBytes("sendevent /dev/input/event$keyDownEventNumber 1 $keyDownID 1\n")
+                            //sync 状态
+                            os.writeBytes("sendevent /dev/input/event$keyDownEventNumber 0 0 0\n")
+                            // 刷新输出流
+                            os.flush()
+                        } catch (e: Exception) {
+                            Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT)
+                                .show()
+                        }
+
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        try {
+                            // 按下按钮时模拟松开键盘下键
+                            val os = DataOutputStream(proc.outputStream)
+                            // 发送下键的 Up 事件
+                            os.writeBytes("sendevent /dev/input/event$keyDownEventNumber 1 $keyDownID 0\n")
+                            //sync 状态
+                            os.writeBytes("sendevent /dev/input/event$keyDownEventNumber 0 0 0\n")
+                            // 刷新输出流
+                            os.flush()
+                        } catch (e: Exception) {
+                            Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT)
+                                .show()
+                        }
+
+                    }
+                }
+                true
+            }
+
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -158,6 +298,13 @@ class MainActivity : AppCompatActivity() {
 
         sharedPref = getSharedPreferences("setting_prefs", Context.MODE_PRIVATE)
 
+        // 该 Switch 用于控制悬浮窗的显示
+        val switch = findViewById<Switch>(R.id.start_switch)
+
+        // 获取悬浮窗及窗口管理器
+        floatingWindow = View.inflate(this, R.layout.floating_window, null)
+        floatingWindowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+
         // 启用时调用读取设置方法
         loadSettings()
         // 启动时调用屏幕捕获方法
@@ -168,8 +315,7 @@ class MainActivity : AppCompatActivity() {
         catchDownKey()
         // 启动时调用保存设置方法
         saveSettings()
-        // 该 Switch 用于控制悬浮窗的显示
-        val switch = findViewById<Switch>(R.id.start_switch)
+
         switch.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
                 // 点击 Switch 后检查是否已授予悬浮窗权限
@@ -516,111 +662,18 @@ class MainActivity : AppCompatActivity() {
     // 显示悬浮窗的方法
     @SuppressLint("ClickableViewAccessibility")
     private fun showFloatingWindow() {
-        // 初始化悬浮窗所需的变量
-        floatingWindowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        floatingWindow = View.inflate(this, R.layout.floating_window, null)
-        params = WindowManager.LayoutParams(
-            100, // 宽度
-            200, // 高度
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, // 窗口类型
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, // 不可获得焦点
-            PixelFormat.TRANSLUCENT // 半透明
-        )
-        // 设置悬浮窗的位置
-        params.gravity = Gravity.TOP or Gravity.END
-        // 位于屏幕最右侧
-        params.x = 0
-        // 位于 1/5 的高度处
-        params.y = (Resources.getSystem().displayMetrics.heightPixels / 5)
-        // 显示悬浮窗
-        floatingWindowManager.addView(floatingWindow, params)
+        // 注册广播接收器
+        val filter = IntentFilter(FloatingWindowService.SERVICE_READY_ACTION)
+        registerReceiver(serviceReadyReceiver, filter)
 
-        // 初始化按钮所需的变量
-        upButton = floatingWindow.findViewById(R.id.up_button)
-        downButton = floatingWindow.findViewById(R.id.down_button)
-
-        val runtime = Runtime.getRuntime()
-        // 请求 Root 权限
-        val proc = runtime.exec("su")
-
-        // 设置按钮的监听器，以在触摸按钮时模拟键盘按键
-        upButton.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    try {
-                        // 按下按钮时模拟按下键盘上键
-                        val os = DataOutputStream(proc.outputStream)
-                        // 发送上键的 Down 事件
-                        os.writeBytes("sendevent /dev/input/event$keyUpEventNumber 1 $keyUpID 1\n")
-                        // sync 状态
-                        os.writeBytes("sendevent /dev/input/event$keyUpEventNumber 0 0 0\n")
-                        // 刷新输出流
-                        os.flush()
-                    } catch (e: Exception) {
-                        Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT)
-                            .show()
-                    }
-                }
-                MotionEvent.ACTION_UP -> {
-                    try {
-                        // 松开按钮时模拟松开键盘上键
-                        val os = DataOutputStream(proc.outputStream)
-                        // 发送上键的 Up 事件
-                        os.writeBytes("sendevent /dev/input/event$keyUpEventNumber 1 $keyUpID 0\n")
-                        // sync 状态
-                        os.writeBytes("sendevent /dev/input/event$keyUpEventNumber 0 0 0\n")
-                        // 刷新输出流
-                        os.flush()
-                    } catch (e: Exception) {
-                        Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT)
-                            .show()
-                    }
-                }
-            }
-            true
-        }
-
-        downButton.setOnTouchListener { v, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    try {
-                        // 松开按钮时模拟按下键盘下键
-                        val os = DataOutputStream(proc.outputStream)
-                        // 发送下键的 Down 事件
-                        os.writeBytes("sendevent /dev/input/event$keyDownEventNumber 1 $keyDownID 1\n")
-                        //sync 状态
-                        os.writeBytes("sendevent /dev/input/event$keyDownEventNumber 0 0 0\n")
-                        // 刷新输出流
-                        os.flush()
-                    } catch (e: Exception) {
-                        Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT)
-                            .show()
-                    }
-
-                }
-                MotionEvent.ACTION_UP -> {
-                    try {
-                        // 按下按钮时模拟松开键盘下键
-                        val os = DataOutputStream(proc.outputStream)
-                        // 发送下键的 Up 事件
-                        os.writeBytes("sendevent /dev/input/event$keyDownEventNumber 1 $keyDownID 0\n")
-                        //sync 状态
-                        os.writeBytes("sendevent /dev/input/event$keyDownEventNumber 0 0 0\n")
-                        // 刷新输出流
-                        os.flush()
-                    } catch (e: Exception) {
-                        Toast.makeText(applicationContext, "出现错误，可能是没有 Root 权限", Toast.LENGTH_SHORT)
-                            .show()
-                    }
-
-                }
-            }
-            true
-        }
+        // 启动服务
+        val intent = Intent(this, FloatingWindowService::class.java)
+        startService(intent)
     }
 
     // 隐藏悬浮窗
     private fun hideFloatingWindow() {
-        windowManager.removeView(floatingWindow)
+        val intent = Intent(this, FloatingWindowService::class.java)
+        stopService(intent)
     }
 }
