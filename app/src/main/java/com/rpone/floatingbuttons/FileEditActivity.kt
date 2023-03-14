@@ -1,5 +1,6 @@
 package com.rpone.floatingbuttons
 
+import ItemAdapter
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -15,6 +16,8 @@ import android.widget.ListView
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.RecyclerView
+import com.rpone.floatingbuttons.data.Datasource
 
 class FileEditActivity : AppCompatActivity() {
 
@@ -101,5 +104,12 @@ class FileEditActivity : AppCompatActivity() {
             32
         )
         navList.addHeaderView(headerView)
+
+        val myDataset = Datasource().loadInfo()
+
+        val recyclerView = findViewById<RecyclerView>(R.id.recycler_view)
+        recyclerView.adapter = ItemAdapter(this, myDataset)
+
+        recyclerView.setHasFixedSize(true)
     }
 }
