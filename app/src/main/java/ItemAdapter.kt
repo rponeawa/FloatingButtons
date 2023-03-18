@@ -10,7 +10,7 @@ import androidx.core.content.ContextCompat.startActivity
 import androidx.core.content.FileProvider
 import androidx.recyclerview.widget.RecyclerView
 import com.rpone.floatingbuttons.R
-import com.rpone.floatingbuttons.model.ButtonInfo
+import com.rpone.floatingbuttons.models.ButtonInfo
 import java.io.File
 
 class ItemAdapter(
